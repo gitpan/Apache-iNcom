@@ -5,6 +5,7 @@ Apache-Session-generate_id.patch
 ChangeLog
 MANIFEST
 MANIFEST.SKIP
+NEWS
 iNcom.spec
 Makefile.PL
 test.pl
@@ -16,6 +17,7 @@ lib/Apache/iNcom/Localizer.pm
 lib/Apache/iNcom/OrderManager.pm
 lib/Apache/iNcom/Request.pm
 lib/Apache/iNcom/Session.pm
+lib/Apache/iNcom/SessionLocker.pm
 lib/Apache/iNcom/UserDBAuthen.pm
 lib/Apache/iNcom/UserDBAuthz.pm
 lib/Apache/iNcom.pm

@@ -43,12 +43,41 @@ use Apache::iNcom::Localizer;
 
 use vars qw($VERSION);
 BEGIN {
-    ($VERSION) = '0.08';
+    ($VERSION) = '0.09';
 }
 
 my %VALID_PNOTES = map { $_ => 1 } qw (
     INCOM_SESSION INCOM_DBH INCOM_LOCALIZER INCOM_COOKIES
 );
+
+# Grabbed from CGI.pm by Lincoln Stein
+sub offset_calc {
+    my($time) = @_;
+    my(%mult) = ('s'=>1,
+                 'm'=>60,
+                 'h'=>60*60,
+                 'd'=>60*60*24,
+                 'M'=>60*60*24*30,
+                 'y'=>60*60*24*365);
+    # format for time can be in any of the forms...
+    # "now" -- expire immediately
+    # "+180s" -- in 180 seconds
+    # "+2m" -- in 2 minutes
+    # "+12h" -- in 12 hours
+    # "+1d"  -- in 1 day
+    # "+3M"  -- in 3 months
+    # "+2y"  -- in 2 years
+    # "-3m"  -- 3 minutes ago(!)
+    my($offset);
+    if (!$time || (lc($time) eq 'now')) {
+        $offset = 0;
+    } elsif ($time=~/^([+-]?(?:\d+|\d*\.\d*))([mhdMy]?)/) {
+        $offset = ($mult{$2} || 1)*$1;
+    } else {
+	die "invalid expiration offset: $time\n";
+    }
+    return ($offset);
+}
 
 sub db_init {
     my $r = shift;
@@ -204,8 +233,15 @@ sub session_init {
 
 	# Load the user's session
 	eval {
+	    # Make sure it looks like a session id
+	    die "Invalid session id: $session_id\n"
+	      unless length $session_id == 32 &&
+		$session_id =~ tr/a-fA-F0-9/a-fA-F0-9/ == 32;
+
 	    tie %session, 'Apache::iNcom::Session', $session_id,
-	      { dbh => $r->pnotes( "INCOM_DBH") };
+	      { dbh => $r->pnotes( "INCOM_DBH"),
+		Serialize => $r->dir_config( "INCOM_SESSION_SERIALIZE_ACCESS" ),
+	      };
 
 	    # Save the session for future handlers
 	    $r->pnotes( INCOM_SESSION => \%session );
@@ -219,6 +255,7 @@ sub session_init {
 	};
 	if ( $@ ) {
 	    # The session ID is probably invalid
+	    chomp $@;
 	    $r->warn( "error loading session: $@" );
 	} else {
 	    # Return ref to session to indicate success
@@ -242,14 +279,14 @@ sub return_error {
 
     $map = $r->server_root_relative( $map );
     unless ( -e $map && -f _ && -r _ ) {
-	$r->log_warn( "INCOM_ERROR_PROFILE is not valid" );
+	$r->warn( "INCOM_ERROR_PROFILE is not valid" );
 	return $status;
     }
 
     my $response = eval {
 	my $profile = do $map;
 	unless ( ref $profile eq "HASH" ) {
-	    $r->log_warn( "INCOM_ERROR_PROFILE didn't return an hash ref" );
+	    $r->warn( "INCOM_ERROR_PROFILE didn't return an hash ref" );
 	    return $status;
 	}
 
@@ -258,7 +295,7 @@ sub return_error {
 	$profile->{$error_cond} || $profile->{$status};
     };
     if ( $@) {
-	$r->log_warn( "error while evaluating error profile: $@" );
+	$r->warn( "error while evaluating error profile: $@" );
 	return $status;
     }
 
@@ -380,7 +417,9 @@ sub new_session_handler {
     my %session;
     eval {
 	tie %session, 'Apache::iNcom::Session', undef,
-	  { dbh => $r->pnotes( "INCOM_DBH") };
+	  { dbh => $r->pnotes( "INCOM_DBH"),
+	    Serialize => $r->dir_config( "INCOM_SESSION_SERIALIZE_ACCESS" ),
+	  };
 
 	bake_session_cookie( $r, $session{_session_id} );
     };
@@ -512,6 +551,8 @@ sub error_handler {
 		 };
     my $rc = HTML::Embperl::Execute( $params );
 
+    $req->cleanup_aliases;
+
     my $dbh	= $r->pnotes( "INCOM_DBH" );
     if ($rc != OK && $rc != MOVED && $rc != REDIRECT ) {
 	# If there was an error, rollback all changes
@@ -607,6 +648,8 @@ sub default_handler {
 		 };
     my $rc = HTML::Embperl::Execute( $params );
 
+    $req->cleanup_aliases;
+
     my $dbh	= $r->pnotes( "INCOM_DBH" );
     if ($rc != OK && $rc != MOVED && $rc != REDIRECT ) {
 	# If there was an error, rollback all changes
@@ -643,6 +686,25 @@ sub request_cleanup {
 
     my $dbh = $r->pnotes( "INCOM_DBH" );
     if ( $dbh ) {
+	# Delete expired sessions on 5% of the requests
+	if ( rand 100 < 5 ) {
+	    eval {
+		my $session_expires = 
+		  $r->dir_config( "INCOM_SESSION_EXPIRES" );
+		my $offset;
+		if ( $session_expires ) {
+		    $offset = offset_calc( $session_expires );
+		} else {
+		    $offset = 3600 * 24; # One day
+		}
+		# XXX Is this really portable ????
+		my $time = localtime ( time - $offset);
+		$dbh->do( "DELETE FROM sessions WHERE last_update < '$time'" );
+		$dbh->commit;
+	    };
+	    $r->log_error( "error removing old sessions: $@" ) if $@;
+	}
+
 	eval {
 	    $dbh->disconnect unless $dbh;
 	};
@@ -889,6 +951,12 @@ through the $Locale object.
 =head2 SESSION DIRECTIVES
 
 =over
+
+=item INCOM_SESSION_SERIALIZE_ACCESS
+
+Set this to 1 to serialize access through session. This will make sure
+that only one session's request is processed at a time. You should set
+this to 1 if your site uses frameset.
 
 =item INCOM_SESSION_SECURE
 

@@ -38,12 +38,20 @@ use HTML::FormValidator;
 
 use Symbol;
 
-use vars qw( $VERSION );
+use vars qw( @ISA @EXPORT @EXPORT_OK %EXPORT_TAGS $VERSION );
 
 use Carp;
 
 BEGIN {
-    ($VERSION) = '$Revision: 1.13 $' =~ /Revision: ([\d.]+)/;
+    use Exporter;
+
+    @ISA       = qw( Exporter );
+    @EXPORT    = ();
+    @EXPORT_OK = ();
+    %EXPORT_TAGS = (); # This is filled later near the
+		       # declaration of global variables
+
+    ($VERSION) = '$Revision: 1.15 $' =~ /Revision: ([\d.]+)/;
 }
 
 =pod
@@ -288,6 +296,8 @@ sub login {
 
 	$self->{userdb}->user_update( $user );
 
+	# Create the user session
+	$self->{session}{_incom_user_session} = {};
 	$self->{user} = $user;
     }
 
@@ -313,6 +323,7 @@ sub logout {
     if ( exists $self->{user} ) {
 	delete $self->{user};
 	delete $self->{session}{_incom_logged_in};
+	delete $self->{session}{_incom_user_session};
     }
 }
 
@@ -320,8 +331,20 @@ sub logout {
 # symbol table manipulation, because
 # Include files remember the state 
 # of lexical variable -> closure.
-use vars qw( $DB %Session $package $Cart $Request $UserDB
+use vars qw( $DB %Session %UserSession $package $Cart $Request $UserDB
 	     $Validator $Order $Locale $Localizer ); #)
+
+BEGIN {
+    push @EXPORT_OK, qw( $package );
+    $EXPORT_TAGS{globals} = [ qw( $DB %Session %UserSession $Cart $Request 
+				  $UserDB $Validator $Order $Locale
+				  $Localizer ) ];
+    $EXPORT_TAGS{functions} = [ qw( Localize Currency Include
+				     TextInclude QueryArgs ) ];
+
+    Exporter::export_ok_tags( 'globals' );
+    Exporter::export_ok_tags( 'functions' );
+}
 
 =pod
 
@@ -349,13 +372,21 @@ pricing profile.
 
 =item $Order
 
-An Apache::iNcom::OrderManager object initialized with the configured 
+An Apache::iNcom::OrderManager object initialized with the configured
 order profiles.
 
 =item %Session
 
-A hash which associated with the user associated. Values in that hash
-will persist across request.
+A hash which associated with the current client. Values in that hash
+will persist across request until the user close its browser or
+C<INCOM_SESSION_EXPIRES> time has elapsed.
+
+=item %UserSession
+
+A hash which associated with the user currently logged. Values in that
+hash will persist across request as long as the client is logged in
+and will be cleared once the user logs out.
+
 
 =item $UserDB
 
@@ -384,15 +415,16 @@ configuration directives.
 sub setup_aliases {
     my ( $self ) = shift;
 
-    $package	= $self->{package};
-    $DB		= $self->{database};
-    $Cart	= $self->{cart};
-    $Order	= $self->{order};
-    $Request	= $self;
-    *Session	= $self->{session};
-    $UserDB	= $self->{userdb};
-    $Validator	= $self->{validator};
-    $Localizer	= $self->{req_rec}->pnotes( "INCOM_LOCALIZER" );
+    $package	 = $self->{package};
+    $DB		 = $self->{database};
+    $Cart	 = $self->{cart};
+    $Order	 = $self->{order};
+    $Request	 = $self;
+    *Session	 = $self->{session};
+    *UserSession = $self->{session}{_incom_user_session};
+    $UserDB	 = $self->{userdb};
+    $Validator	 = $self->{validator};
+    $Localizer	 = $self->{req_rec}->pnotes( "INCOM_LOCALIZER" );
     if ( $self->{req_rec}->dir_config( "INCOM_LOCALE" ) ) {
 	$Locale	=
 	  $Localizer->get_handle( $self->{req_rec}->dir_config( "INCOM_LOCALE" ) );
@@ -409,12 +441,50 @@ sub setup_aliases {
 	*{"$package\:\:Locale"}		= \$Locale	if $Locale;
 	*{"$package\:\:Localizer"}	= \$Localizer	if $Localizer;
 	*{"$package\:\:Session"}	= \%Session;
+	*{"$package\:\:UserSession"}	= \%UserSession;
 	*{"$package\:\:Request"}	= \$Request;
 	*{"$package\:\:Localize"}	= \&Localize	if $Locale;
 	*{"$package\:\:Currency"}	= \&Currency	if $Locale;
 	*{"$package\:\:Include"}	= \&Include;
 	*{"$package\:\:TextInclude"}	= \&TextInclude;
 	*{"$package\:\:QueryArgs"}	= \&QueryArgs;
+    };
+}
+
+sub cleanup_aliases {
+    my ( $self ) = shift;
+
+    $package	 = undef;
+    $DB		 = undef;
+    $Cart	 = undef;
+    $Order	 = undef;
+    $Request	 = undef;
+    *Session	 = undef; # Undef the symbol, do not destroy the hash
+    *UserSession = undef;
+    $UserDB	 = undef;
+    $Validator	 = undef;
+    $Localizer	 = undef;
+    $Locale	 = undef;
+
+    # Play magic in the namespace of the page
+    {
+	no strict 'refs';
+
+	*{"$package\:\:DB"}		= undef;
+	*{"$package\:\:UserDB"}		= undef;
+	*{"$package\:\:Cart"}		= undef;
+	*{"$package\:\:Order"}		= undef;
+	*{"$package\:\:Validator"}	= undef;
+	*{"$package\:\:Locale"}		= undef;
+	*{"$package\:\:Localizer"}	= undef;
+	*{"$package\:\:Session"}	= undef;
+	*{"$package\:\:UserSession"}	= undef;
+	*{"$package\:\:Request"}	= undef;
+	*{"$package\:\:Localize"}	= undef;
+	*{"$package\:\:Currency"}	= undef;
+	*{"$package\:\:Include"}	= undef;
+	*{"$package\:\:TextInclude"}	= undef;
+	*{"$package\:\:QueryArgs"}	= undef;
     };
 }
 

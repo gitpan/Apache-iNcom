@@ -27,14 +27,14 @@ use strict;
 use vars qw(@ISA $VERSION);
 
 BEGIN {
-    ($VERSION) = '$Revision: 1.4 $' =~ /Revision: ([\d.]+)/;
+    ($VERSION) = '$Revision: 1.5 $' =~ /Revision: ([\d.]+)/;
     @ISA = qw(Apache::Session);
 }
 
 use Digest::MD5 qw( md5_hex );
 
 use Apache::Session;
-use Apache::Session::NullLocker;
+use Apache::iNcom::SessionLocker;
 use Apache::Session::DBIBase64Store;
 
 use Symbol;
@@ -53,7 +53,7 @@ sub get_object_store {
 sub get_lock_manager {
     my $self = shift;
 
-    return new Apache::Session::NullLocker $self;
+    return new Apache::iNcom::SessionLocker;
 }
 
 # We want longer session id than the 16 characters of

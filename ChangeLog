@@ -1,3 +1,70 @@
+2000-03-31  Francis J. Lacoste  <francis.lacoste@iNsu.COM>
+
+	* Tag: INCOM_0_09
+
+	* MANIFEST: Added NEWS file.
+
+	* lib/Apache/iNcom.pm: 
+	(return_error) s/log_warn/warn.
+
+2000-03-30  Francis J. Lacoste  <francis.lacoste@iNsu.COM>
+
+	* lib/Apache/iNcom.pm:
+	($VERSION) Upgraded to 0.09.
+
+	* lib/HTML/FormValidator.pm: 
+	(filter_quotemeta) Wrapper around quotemeta.
+	(filter_uc) Wrapper around uc.
+	(filter_lc) Wrapper around lc.
+	(filter_ucfirst) Wrapper around ucfirst.
+	(filter_sql_wildcard) Transform * into %.
+
+	* lib/Apache/iNcom/Session.pm: 
+	(get_lock_manager): Use Apache::iNcom::SessionLocker has lock manager.
+
+	* lib/Apache/iNcom/Request.pm: 
+	(cleanup_aliases) Undef the symbol of %Session and %UserSession, 
+	since a %hash = undef call CLEAR in tied implementation.
+
+	* lib/Apache/iNcom/SessionLocker.pm: LockManager to serialize
+	access to session. It will be used only if 
+	INCOM_SESSION_SERIALIZE_ACCESS is set to true.
+
+	* lib/Apache/iNcom.pm: 
+	(session_init): Make sure the cookies' value looks like a 
+	session id. Added Serialize parameter.
+	(new_session_handler) Added Serialize parameter.
+	(pod) Documented INCOM_SESSION_SERIALIZE_ACCESS directive.
+	
+2000-03-29  Francis J. Lacoste  <francis.lacoste@iNsu.COM>
+
+	* lib/HTML/FormValidator.pm: 
+	(filter_phone) Strip blank space.
+
+	* lib/Apache/iNcom/Request.pm: 
+	(cleanup_aliases) New method which undoes
+	what setup_aliases does.
+	(setup_aliases) New %UserSession hash.
+	(BEGIN) Added possibility to import the global variables.
+
+	* lib/Apache/iNcom.pm: 
+	(offset_calc) Method grabbed from CGI.pm.
+	(request_handler) Call cleanup_aliases.
+	(error_handler) Call cleanup_aliases.
+	(request_cleanup) Delete expired sessions.	
+
+2000-03-17  Francis J. Lacoste  <francis.lacoste@iNsu.COM>
+
+	* lib/HTML/FormValidator.pm: 
+	(validate) Fixed field_filters processing. 
+	(filters) Added integer, pos_integer, neg_integer, 
+	decimal, pos_decimal, neg_decimal,
+	dollars and phone filters. 
+	(filter_trim) Fixed return value.
+	(valid_american_phone) True if more than 7 digits.
+	(valid_phone) True if more than 6 digits.
+
+
 2000-02-25  Francis J. Lacoste  <francis.lacoste@iNsu.COM>
 
 	* TAG: INCOM_0_08

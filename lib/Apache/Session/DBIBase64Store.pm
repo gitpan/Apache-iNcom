@@ -24,7 +24,7 @@ use MIME::Base64;
 use vars qw($VERSION);
 
 BEGIN {
-    ($VERSION) = '$Revision: 1.1 $' =~ /Revision: ([\d.]+)/ ;
+    ($VERSION) = '$Revision: 1.2 $' =~ /Revision: ([\d.]+)/ ;
 }
 
 sub new {
@@ -87,8 +87,8 @@ sub update {
 
     my $serialized = encode_base64( nfreeze $session->{data} );
 
-    $sth->execute( length $serialized,$serialized,
-		   $session->{data}->{_session_id} );
+    $sth->execute( length $serialized, $serialized,
+		   $session->{data}{_session_id} );
     $sth->finish;
     $dbh->commit;
 }
@@ -190,6 +190,7 @@ This modules expect a table created with the following schema :
 	a_session   TEXT,
 	created	    TIMESTAMP DEFAULT 'now()',
 	last_update TIMESTAMP DEFAULT 'now()'
+	locked_by   INT
     );
 
 

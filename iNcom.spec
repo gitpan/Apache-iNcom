@@ -1,6 +1,6 @@
 Summary:  mod_perl based Internet Commerce Framework
 Name: Apache-iNcom
-Version: 0.08
+Version: 0.09
 Release: 1i
 Source: http://indev.insu.com/sources/%{name}-%{version}.tar.gz
 Copyright: GPL
@@ -60,9 +60,13 @@ rm -fr $RPM_BUILD_ROOT
 
 %files -f %{name}-file-list
 %defattr(-,root,root)
-%doc README ChangeLog demo
+%doc README ChangeLog demo *.patch
 
 %changelog
+* Thu Mar 30 2000  Francis J. Lacoste <francis.lacoste@iNsu.COM> 
+  [0.09-i]
+- Released 0.09.
+
 * Fri Feb 25 2000  Francis J. Lacoste <francis.lacoste@iNsu.COM> 
   [0.08-1i]
 - Release 0.08.
